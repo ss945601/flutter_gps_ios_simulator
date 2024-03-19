@@ -31,6 +31,7 @@ environment:
 dependencies:
   cupertino_icons: ^1.0.2
   dash_painter: ^1.0.2
+  file_picker: ^6.2.0
   flutter:
     sdk: flutter
   flutter_map: ^6.1.0
@@ -38,7 +39,9 @@ dependencies:
   latlong2: ^0.9.0
   location: ^5.0.3
   numberpicker: ^2.1.2
+  path_provider: ^2.1.2
   rxdart: ^0.27.7
+  shared_preferences: ^2.2.2
   url_launcher: ^6.2.5
   xml: ^6.5.0
 

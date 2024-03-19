@@ -1,16 +1,23 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:dash_painter/dash_painter.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
+import 'package:map_fake_gps/config.dart';
 import 'package:map_fake_gps/gps_util.dart';
 import 'package:map_fake_gps/painter.dart';
 import 'package:numberpicker/numberpicker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>();
 
 void main() {
   runApp(const MyApp());
@@ -23,6 +30,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Demo',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
@@ -54,6 +62,25 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    getPath().then((value) {
+      if (Config.path == "") {
+        // Obtain shared preferences.
+
+        getApplicationDocumentsDirectory().then((value) {
+          setState(() {
+            Config.path = value.path;
+          });
+        });
+      }
+    });
+  }
+
+  Future<void> getPath() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? path = prefs.getString('path');
+    setState(() {
+      Config.path = path ?? "";
+    });
   }
 
   Future<LocationData?> _moveToCurrentLocation() async {
@@ -101,6 +128,76 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+        endDrawer: Drawer(
+          child: Column(children: <Widget>[
+            ListTile(
+              leading: Icon(Icons.download),
+              title: Text('Gpx file path : '),
+              subtitle: Text(Config.path),
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) {
+                    var textCtr = TextEditingController(text: Config.path);
+                    return AlertDialog(
+                      title: Text("The path of gpx file",
+                          style: Theme.of(context).textTheme.titleLarge),
+                      content: TextField(controller: textCtr),
+                      actions: [
+                        OutlinedButton(
+                            onPressed: () async {
+                              String? selectedDirectory =
+                                  await FilePicker.platform.getDirectoryPath();
+
+                              if (selectedDirectory == null) {
+                                // User canceled the picker
+                              } else {
+                                setState(() {
+                                  Config.path = selectedDirectory;
+                                });
+                                final SharedPreferences prefs =
+                                    await SharedPreferences.getInstance();
+                                prefs.setString("path", selectedDirectory);
+                                Navigator.pop(context);
+                              }
+                            },
+                            child: Text("Broswer...")),
+                        OutlinedButton(
+                            onPressed: () async {
+                              setState(() {
+                                Config.path = textCtr.text;
+                              });
+                              // Obtain shared preferences.
+                              final SharedPreferences prefs =
+                                  await SharedPreferences.getInstance();
+                              prefs.setString("path", textCtr.text);
+                              Navigator.pop(context);
+                            },
+                            child: Text("Confirm"))
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+            Spacer(),
+            ListTile(
+              titleAlignment: ListTileTitleAlignment.center,
+              title: Center(
+                  child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.close),
+                  Text('Close'),
+                ],
+              )),
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+          ]),
+        ),
+        key: _scaffoldKey,
         floatingActionButton: StreamBuilder<bool?>(
             stream: refreshMarkSubjectStream,
             builder: (context, snapshot) {
@@ -116,7 +213,9 @@ class _MyHomePageState extends State<MyHomePage> {
                               _lastPersonMarkPosition!.mapPosition,
                               _personMarkPosition!.mapPosition,
                               _personMarkPosition!.mapPosition.round(),
-                            ], speedMph: _speedValue.toDouble());
+                            ],
+                                speedMph: _speedValue.toDouble(),
+                                filePath: Config.path);
                             _startIconSubject
                                 .add(Icon(Icons.check, color: Colors.green));
                             Future.delayed(Duration(seconds: 2)).then((value) {
@@ -183,8 +282,12 @@ class _MyHomePageState extends State<MyHomePage> {
                           NumberPicker(
                             textStyle: Theme.of(context)
                                 .textTheme
-                                .titleLarge!
+                                .titleSmall!
                                 .copyWith(color: Colors.blueGrey),
+                            selectedTextStyle:Theme.of(context)
+                                .textTheme
+                                .titleLarge!
+                                .copyWith(color: Colors.redAccent),
                             value: _speedValue,
                             axis: Axis.horizontal,
                             minValue: 3,
@@ -196,7 +299,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             'Speed value: $_speedValue MPH',
                             style: Theme.of(context)
                                 .textTheme
-                                .titleLarge!
+                                .titleMedium!
                                 .copyWith(
                                     color:
                                         const Color.fromARGB(255, 69, 87, 96)),
@@ -207,7 +310,19 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
               ),
-            )
+            ),
+            Positioned.fill(
+                top: 12,
+                right: 12,
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                      iconSize: 30,
+                      onPressed: () {
+                        _scaffoldKey.currentState!.openEndDrawer();
+                      },
+                      icon: Icon(Icons.settings)),
+                ))
           ],
         ));
   }

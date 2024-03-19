@@ -9,7 +9,7 @@ import 'package:xml/xml.dart';
 
 void generateGpxFile(List<LatLng> waypoints,
     {double speedMph = 15,
-    String filePath = "~/Desktop/output.gpx"}) {
+    String filePath = ""}) {
   final gpx = Gpx();
 
   // Set the time for the first waypoint to current time
@@ -68,7 +68,7 @@ double toRadians(double degrees) {
 }
 
 Future<void> writeGpxToFile(Gpx gpx, String filePath) async {
-  final file = File(filePath);
+  final file = File(filePath+"/output.gpx");
   var content = GpxWriter().asString(gpx, pretty: true);
 
   await file.writeAsString(removeMilliseconds(content));
@@ -83,7 +83,7 @@ String removeMilliseconds(String gpxContent) {
   // Loop through each 'time' element
   for (final element in timeElements) {
     // Extract the time string
-    final timeStr = element.text;
+    final timeStr = element.innerText;
 
     // Split the time string at the decimal point
     final parts = timeStr.split('.');
