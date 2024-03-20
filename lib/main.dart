@@ -1,10 +1,6 @@
-import 'dart:io';
 import 'dart:math';
-
-import 'package:dash_painter/dash_painter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
@@ -17,7 +13,7 @@ import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>();
+final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
 void main() {
   runApp(const MyApp());
@@ -54,7 +50,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final PublishSubject<bool?> _refreshMark = PublishSubject<bool?>();
   Stream<bool?> get refreshMarkSubjectStream => _refreshMark.stream;
   final BehaviorSubject<Icon> _startIconSubject =
-      BehaviorSubject<Icon>.seeded(Icon(Icons.start));
+      BehaviorSubject<Icon>.seeded(const Icon(Icons.start));
   Stream<Icon> get startSubjectStream => _startIconSubject.stream;
   Position? _personMarkPosition;
   Position? _lastPersonMarkPosition;
@@ -62,10 +58,8 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    getPath().then((value) {
+    _getPath().then((value) {
       if (Config.path == "") {
-        // Obtain shared preferences.
-
         getApplicationDocumentsDirectory().then((value) {
           setState(() {
             Config.path = value.path;
@@ -75,7 +69,22 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  Future<void> getPath() async {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        endDrawer: _buildSettingDrawer(context),
+        key: _scaffoldKey,
+        floatingActionButton: _buildToolBar(),
+        body: Stack(
+          children: [
+            _buildMap(context),
+            _buildSpeedPicker(context),
+            _buildSettingButton()
+          ],
+        ));
+  }
+
+  Future<void> _getPath() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? path = prefs.getString('path');
     setState(() {
@@ -83,38 +92,38 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  Future<LocationData?> _moveToCurrentLocation() async {
+  Future<void> _moveToCurrentLocation() async {
     Location location = Location();
 
-    bool _serviceEnabled;
-    PermissionStatus _permissionGranted;
-    LocationData _locationData;
+    bool serviceEnabled;
+    PermissionStatus permissionGranted;
+    LocationData locationData;
 
-    _serviceEnabled = await location.serviceEnabled();
-    if (!_serviceEnabled) {
-      _serviceEnabled = await location.requestService();
-      if (!_serviceEnabled) {
-        return null;
+    serviceEnabled = await location.serviceEnabled();
+    if (!serviceEnabled) {
+      serviceEnabled = await location.requestService();
+      if (!serviceEnabled) {
+        return;
       }
     }
 
-    _permissionGranted = await location.hasPermission();
-    if (_permissionGranted == PermissionStatus.denied) {
-      _permissionGranted = await location.requestPermission();
-      if (_permissionGranted != PermissionStatus.granted) {
-        return null;
+    permissionGranted = await location.hasPermission();
+    if (permissionGranted == PermissionStatus.denied) {
+      permissionGranted = await location.requestPermission();
+      if (permissionGranted != PermissionStatus.granted) {
+        return;
       }
     }
 
-    _locationData = await location.getLocation();
+    locationData = await location.getLocation();
     _mapController.move(
-        LatLng(_locationData.latitude!, _locationData.longitude!), 18.0);
+        LatLng(locationData.latitude!, locationData.longitude!), 18.0);
   }
 
   Point _latLngConvertScreen(MapPosition map, LatLng goalLatLng) {
     var northWestPoint =
-        Epsg3857().latLngToPoint(map.bounds!.northWest, map.zoom!);
-    var markerPoint = Epsg3857().latLngToPoint(goalLatLng, map.zoom!);
+        const Epsg3857().latLngToPoint(map.bounds!.northWest, map.zoom!);
+    var markerPoint = const Epsg3857().latLngToPoint(goalLatLng, map.zoom!);
     double x = markerPoint.x - northWestPoint.x;
     double y = markerPoint.y - northWestPoint.y;
     return Point(x, y);
@@ -125,209 +134,214 @@ class _MyHomePageState extends State<MyHomePage> {
     _isRefresh = !_isRefresh;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        endDrawer: Drawer(
-          child: Column(children: <Widget>[
-            ListTile(
-              leading: Icon(Icons.download),
-              title: Text('Gpx file path : '),
-              subtitle: Text(Config.path),
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    var textCtr = TextEditingController(text: Config.path);
-                    return AlertDialog(
-                      title: Text("The path of gpx file",
-                          style: Theme.of(context).textTheme.titleLarge),
-                      content: TextField(controller: textCtr),
-                      actions: [
-                        OutlinedButton(
-                            onPressed: () async {
-                              String? selectedDirectory =
-                                  await FilePicker.platform.getDirectoryPath();
-
-                              if (selectedDirectory == null) {
-                                // User canceled the picker
-                              } else {
-                                setState(() {
-                                  Config.path = selectedDirectory;
-                                });
-                                final SharedPreferences prefs =
-                                    await SharedPreferences.getInstance();
-                                prefs.setString("path", selectedDirectory);
-                                Navigator.pop(context);
-                              }
-                            },
-                            child: Text("Broswer...")),
-                        OutlinedButton(
-                            onPressed: () async {
-                              setState(() {
-                                Config.path = textCtr.text;
-                              });
-                              // Obtain shared preferences.
-                              final SharedPreferences prefs =
-                                  await SharedPreferences.getInstance();
-                              prefs.setString("path", textCtr.text);
-                              Navigator.pop(context);
-                            },
-                            child: Text("Confirm"))
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
-            Spacer(),
-            ListTile(
-              titleAlignment: ListTileTitleAlignment.center,
-              title: Center(
-                  child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.close),
-                  Text('Close'),
-                ],
-              )),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-          ]),
-        ),
-        key: _scaffoldKey,
-        floatingActionButton: StreamBuilder<bool?>(
-            stream: refreshMarkSubjectStream,
-            builder: (context, snapshot) {
-              return Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (_lastPersonMarkPosition != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0),
-                      child: FloatingActionButton(
-                          onPressed: () async {
-                            generateGpxFile([
-                              _lastPersonMarkPosition!.mapPosition,
-                              _personMarkPosition!.mapPosition,
-                              _personMarkPosition!.mapPosition.round(),
-                            ],
-                                speedMph: _speedValue.toDouble(),
-                                filePath: Config.path);
-                            _startIconSubject
-                                .add(Icon(Icons.check, color: Colors.green));
-                            Future.delayed(Duration(seconds: 2)).then((value) {
-                              _startIconSubject.add(Icon(Icons.start));
-                            });
-                          },
-                          child: StreamBuilder<Icon>(
-                              stream: startSubjectStream,
-                              builder: (context, startSnapshot) {
-                                return (startSnapshot.data ??
-                                    Icon(Icons.start));
-                              })),
-                    ),
-                  if (_personMarkPosition != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0),
-                      child: FloatingActionButton(
-                          onPressed: () async {
-                            _mapController.move(
-                                _personMarkPosition!.mapPosition, 18.0);
-                          },
-                          child: Icon(Icons.man)),
-                    ),
-                  FloatingActionButton(
+  StreamBuilder<bool?> _buildToolBar() {
+    return StreamBuilder<bool?>(
+        stream: refreshMarkSubjectStream,
+        builder: (context, snapshot) {
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (_lastPersonMarkPosition != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: FloatingActionButton(
                       onPressed: () async {
-                        _moveToCurrentLocation();
-                      },
-                      child: Icon(Icons.location_on)),
-                  if (_personMarkPosition != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: FloatingActionButton(
-                          onPressed: () async {
-                            setState(() {
-                              _lastPersonMarkPosition = null;
-                              _personMarkPosition = null;
-                            });
-                          },
-                          child: Icon(
-                            Icons.delete,
-                            color: Colors.red,
-                          )),
-                    ),
-                ],
-              );
-            }),
-        body: Stack(
-          children: [
-            _buildMap(context),
-            Positioned(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 20.0),
-                  child: IntrinsicHeight(
-                    child: Container(
-                      decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(120),
-                          borderRadius: BorderRadius.all(Radius.circular(12))),
-                      margin: EdgeInsets.all(8),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: <Widget>[
-                          NumberPicker(
-                            textStyle: Theme.of(context)
-                                .textTheme
-                                .titleSmall!
-                                .copyWith(color: Colors.blueGrey),
-                            selectedTextStyle:Theme.of(context)
-                                .textTheme
-                                .titleLarge!
-                                .copyWith(color: Colors.redAccent),
-                            value: _speedValue,
-                            axis: Axis.horizontal,
-                            minValue: 3,
-                            maxValue: 20,
-                            onChanged: (value) =>
-                                setState(() => _speedValue = value),
-                          ),
-                          Text(
-                            'Speed value: $_speedValue MPH',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium!
-                                .copyWith(
-                                    color:
-                                        const Color.fromARGB(255, 69, 87, 96)),
-                          ),
+                        generateGpxFile([
+                          _lastPersonMarkPosition!.mapPosition,
+                          _personMarkPosition!.mapPosition,
+                          _personMarkPosition!.mapPosition.round(),
                         ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned.fill(
-                top: 12,
-                right: 12,
-                child: Align(
-                  alignment: Alignment.topRight,
-                  child: IconButton(
-                      iconSize: 30,
-                      onPressed: () {
-                        _scaffoldKey.currentState!.openEndDrawer();
+                            speedMph: _speedValue.toDouble(),
+                            filePath: Config.path);
+                        _startIconSubject
+                            .add(const Icon(Icons.check, color: Colors.green));
+                        Future.delayed(const Duration(seconds: 2))
+                            .then((value) {
+                          _startIconSubject.add(const Icon(Icons.start));
+                        });
                       },
-                      icon: Icon(Icons.settings)),
-                ))
+                      child: StreamBuilder<Icon>(
+                          stream: startSubjectStream,
+                          builder: (context, startSnapshot) {
+                            return (startSnapshot.data ??
+                                const Icon(Icons.start));
+                          })),
+                ),
+              if (_personMarkPosition != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: FloatingActionButton(
+                      onPressed: () async {
+                        _mapController.move(
+                            _personMarkPosition!.mapPosition, 18.0);
+                      },
+                      child: const Icon(Icons.man)),
+                ),
+              FloatingActionButton(
+                  onPressed: () async {
+                    _moveToCurrentLocation();
+                  },
+                  child: const Icon(Icons.location_on)),
+              if (_personMarkPosition != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: FloatingActionButton(
+                      onPressed: () async {
+                        setState(() {
+                          _lastPersonMarkPosition = null;
+                          _personMarkPosition = null;
+                        });
+                      },
+                      child: const Icon(
+                        Icons.delete,
+                        color: Colors.red,
+                      )),
+                ),
+            ],
+          );
+        });
+  }
+
+  Drawer _buildSettingDrawer(BuildContext context) {
+    return Drawer(
+      child: Column(children: <Widget>[
+        ListTile(
+          leading: const Icon(Icons.download),
+          title: const Text('Gpx file path : '),
+          subtitle: Text(Config.path),
+          onTap: () {
+            _showEditPathDialog(context);
+          },
+        ),
+        const Spacer(),
+        ListTile(
+          titleAlignment: ListTileTitleAlignment.center,
+          title: const Center(
+              child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.close),
+              Text('Close'),
+            ],
+          )),
+          onTap: () {
+            Navigator.pop(context);
+          },
+        ),
+      ]),
+    );
+  }
+
+  Future<dynamic> _showEditPathDialog(BuildContext context) {
+    return showDialog(
+      context: context,
+      builder: (context) {
+        var textCtr = TextEditingController(text: Config.path);
+        return AlertDialog(
+          title: Text("The path of gpx file",
+              style: Theme.of(context).textTheme.titleLarge),
+          content: TextField(controller: textCtr),
+          actions: [
+            OutlinedButton(
+                onPressed: () async {
+                  String? selectedDirectory =
+                      await FilePicker.platform.getDirectoryPath();
+
+                  if (selectedDirectory == null) {
+                    // User canceled the picker
+                  } else {
+                    setState(() {
+                      Config.path = selectedDirectory;
+                    });
+                    final SharedPreferences prefs =
+                        await SharedPreferences.getInstance();
+                    prefs.setString("path", selectedDirectory);
+                    Navigator.pop(context);
+                  }
+                },
+                child: const Text("Broswer...")),
+            OutlinedButton(
+                onPressed: () async {
+                  setState(() {
+                    Config.path = textCtr.text;
+                  });
+                  // Obtain shared preferences.
+                  final SharedPreferences prefs =
+                      await SharedPreferences.getInstance();
+                  prefs.setString("path", textCtr.text);
+                  Navigator.pop(context);
+                },
+                child: const Text("Confirm"))
           ],
+        );
+      },
+    );
+  }
+
+  Positioned _buildSettingButton() {
+    return Positioned.fill(
+        top: 12,
+        right: 12,
+        child: Align(
+          alignment: Alignment.topRight,
+          child: IconButton(
+              iconSize: 30,
+              onPressed: () {
+                _scaffoldKey.currentState!.openEndDrawer();
+              },
+              icon: const Icon(Icons.settings)),
         ));
   }
 
+  Positioned _buildSpeedPicker(BuildContext context) {
+    return Positioned(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 20.0),
+          child: IntrinsicHeight(
+            child: Container(
+              decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(120),
+                  borderRadius: const BorderRadius.all(Radius.circular(12))),
+              margin: const EdgeInsets.all(8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: <Widget>[
+                  NumberPicker(
+                    textStyle: Theme.of(context)
+                        .textTheme
+                        .titleSmall!
+                        .copyWith(color: Colors.blueGrey),
+                    selectedTextStyle: Theme.of(context)
+                        .textTheme
+                        .titleLarge!
+                        .copyWith(color: Colors.redAccent),
+                    value: _speedValue,
+                    axis: Axis.horizontal,
+                    minValue: 3,
+                    maxValue: 20,
+                    onChanged: (value) => setState(() => _speedValue = value),
+                  ),
+                  Text(
+                    'Speed value: $_speedValue MPH',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium!
+                        .copyWith(color: const Color.fromARGB(255, 69, 87, 96)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Container _buildMap(BuildContext context) {
+    const LatLng initialCenter =  LatLng(24.84138065785531, 121.01890140704562);
+
     return Container(
       height: MediaQuery.of(context).size.height,
       width: MediaQuery.of(context).size.width,
@@ -336,7 +350,7 @@ class _MyHomePageState extends State<MyHomePage> {
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
-              initialCenter: LatLng(24.84138065785531, 121.01890140704562),
+              initialCenter:initialCenter,
               initialZoom: 18.0,
               onTap: (tapPosition, point) {
                 var p = Point(tapPosition.global.dx, tapPosition.global.dy);
@@ -345,7 +359,6 @@ class _MyHomePageState extends State<MyHomePage> {
                 }
                 _personMarkPosition =
                     Position(mapPosition: point, screenPosition: p);
-                print(point);
                 _markRefresh();
               },
               onPositionChanged: (position, hasGesture) {
@@ -390,7 +403,8 @@ class _MyHomePageState extends State<MyHomePage> {
                               20.toDouble(),
                           top: _personMarkPosition!.screenPosition.y -
                               20.toDouble(),
-                          child: Icon(size: 40, color: Colors.red, Icons.man)),
+                          child: const Icon(
+                              size: 40, color: Colors.red, Icons.man)),
                       if (_lastPersonMarkPosition != null)
                         Positioned(
                             left: _lastPersonMarkPosition!.screenPosition.x -
@@ -423,7 +437,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     ],
                   );
                 }
-                return SizedBox.shrink();
+                return const SizedBox.shrink();
               })
         ],
       ),
