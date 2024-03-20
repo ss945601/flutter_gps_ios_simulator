@@ -1,12 +1,12 @@
-# map_fake_gps
+# flutter_map_fake_gps
 
 Map_fake_gps is used to create the gpx.file for simulating location in the Xcode.
 
 **Env**
 
-* MacOS
+* MacOS 14.3
 * Flutter 3.19.1, Dart 3.3.0
-* Xcode
+* Xcode Version 15.2
 
 ## Getting Started
 
@@ -17,9 +17,9 @@ Map_fake_gps is used to create the gpx.file for simulating location in the Xcode
 1. Click setting btn to check the path of repository for .gpx file. (output.gpx)
 2. Click map to set starting point and end point.
 3. Click Start Btn to save .gpx file ( the first btn in the tool bar )
-4. Open Xcode and **run** any project on your mobile, and **click navigator icon btn -> "Add GPS Exchange to Project///" -> select your gpx.file which creating by tool.**
+4. Open Xcode and **run** any project on your mobile, and **click navigator icon btn -> "Add GPS Exchange to Project" -> select your gpx.file which creating by tool.**
    ![1710915774493](image/README/1710915774493.png)
-5. You can control the location in your mobile.
+5. You can control the location in your mobile. (I)
 
-MIT License
-Copyright (c) 2024 StevenChang
+***MIT License
+Copyright (c) 2024 StevenChang***
