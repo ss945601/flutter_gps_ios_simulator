@@ -10,7 +10,7 @@ Map_fake_gps is a tool used to create a GPX file for simulating location in Xcod
 
 ## Getting Started
 
-* App Preview [ [Tha app installer(.dmg)](./installer/dmg_creator/mapGps.dmg)  ]
+* App Preview [ [The app installer(.dmg)](./installer/dmg_creator/mapGps.dmg)  ]
 
 ![1710914547352](image/README/1710914547352.png)
 
