@@ -1,4 +1,4 @@
-# flutter_map_fake_gps
+# flutter_gps_simulator
 
 Map_fake_gps is a tool used to create a GPX file for simulating location in Xcode.
 
